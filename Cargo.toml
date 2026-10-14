@@ -1,0 +1,36 @@
+[package]
+name = "recv"
+version = "0.0.1"
+edition = "2024"
+authors = ["HallowsTechLabs hallow.tech.lab@gmail.com"]
+description = "Standalone HTTP upload server with QR pairing (CLI), and the browser-upload library behind ExifFlow's desktop app."
+
+[lib]
+name = "recv"
+path = "src/lib.rs"
+
+[[bin]]
+name = "recv"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.8", features = ["multipart"] }
+axum-server = { version = "0.8", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+tokio = { version = "1", features = ["full"] }
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+base64 = "0.22"
+exifflow-core = { git = "https://github.com/hallowslab/exifflow-core", tag = "v0.0.1" }
+
+[features]
+include-pem-files = []
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
