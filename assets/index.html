@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="referrer" content="no-referrer" />
+<title>ExifFlow Upload</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #121821;
+    --border: #1e2a38;
+    --text: #dbe6f0;
+    --muted: #7b8b9e;
+    --accent: #22d3ee;
+    --ok: #34d399;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; min-height: 100vh; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.25rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 4px; }
+  .status { color: var(--muted); font-size: 0.9rem; margin: 0 0 24px; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin: 12px 0 6px; }
+  input[type="text"], input[type="password"] {
+    width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: #0e141b; color: var(--text); font-size: 1rem;
+  }
+  button {
+    border: 0; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  }
+  #pairBtn { margin-top: 16px; width: 100%; padding: 14px; background: var(--accent); color: #04121a; font-size: 1rem; }
+  .drop {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 32px 16px; text-align: center;
+    color: var(--muted); transition: border-color 0.15s, background 0.15s;
+  }
+  .drop.over { border-color: var(--accent); background: rgba(34, 211, 238, 0.08); }
+  .pick { display: inline-block; margin-top: 12px; color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+  .summary {
+    position: sticky; top: 8px; z-index: 2;
+    margin-top: 16px; padding: 12px 14px; border-radius: 12px;
+    background: #0e141b; border: 1px solid var(--border);
+  }
+  .summary-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .summary-count { font-size: 0.95rem; font-weight: 600; }
+  .summary-pct { font-size: 0.85rem; color: var(--muted); margin-left: 6px; font-weight: 400; }
+  .summary-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn-sm { padding: 6px 10px; background: #17202b; color: var(--text); border: 1px solid var(--border); }
+  .btn-sm:hover { border-color: var(--accent); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+  .badge-bad { background: rgba(248, 113, 113, 0.15); color: var(--bad); }
+  .overall { height: 6px; margin-top: 10px; background: #0a0f14; border-radius: 3px; overflow: hidden; }
+  .overall .fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+
+  .list { margin-top: 4px; }
+  .row {
+    display: grid; grid-template-columns: 48px 1fr auto; gap: 10px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: 0; }
+  .thumb {
+    width: 48px; height: 48px; border-radius: 8px; overflow: hidden; background: #0e141b;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .info { min-width: 0; }
+  .name { font-size: 0.9rem; overflow-wrap: anywhere; }
+  .meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .bar { height: 5px; margin-top: 6px; background: #0a0f14; border-radius: 3px; overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+  .status { font-size: 0.75rem; color: var(--muted); min-width: 56px; text-align: right; }
+  .row.done .fill { background: var(--ok); }
+  .row.done .status { color: var(--ok); font-size: 1rem; }
+  .row.failed .fill { background: var(--bad); }
+  .row.failed .status { color: var(--bad); font-size: 1rem; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(34, 211, 238, 0.25); border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  details.completed { margin-top: 12px; }
+  details.completed > summary {
+    cursor: pointer; list-style: none; font-size: 0.85rem; color: var(--muted);
+    padding: 8px 0; user-select: none;
+  }
+  details.completed > summary::-webkit-details-marker { display: none; }
+  details.completed > summary::before { content: '\25B8  '; color: var(--accent); }
+  details.completed[open] > summary::before { content: '\25BE  '; }
+  details.completed .row { opacity: 0.85; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ExifFlow</h1>
+  <p id="status" class="status">Connecting...</p>
+
+  <section id="pair" hidden>
+    <p>Enter the pairing details shown on the desktop app.</p>
+    <label for="username">Username</label>
+    <input id="username" type="text" autocomplete="username" />
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+    <button id="pairBtn" type="button">Pair</button>
+  </section>
+
+  <section id="uploader" hidden>
+    <div id="drop" class="drop">
+      <div>Drop files here</div>
+      <label class="pick" for="files">or choose files</label>
+      <input id="files" type="file" multiple accept="image/*,video/*" hidden />
+    </div>
+
+    <div id="summary" class="summary" hidden>
+      <div class="summary-head">
+        <div>
+          <span id="summaryCount" class="summary-count">0 of 0 uploaded</span>
+          <span id="summaryPct" class="summary-pct"></span>
+          <span id="failedBadge" class="badge badge-bad" hidden></span>
+        </div>
+        <div class="summary-actions">
+          <button id="retryBtn" class="btn-sm" type="button" hidden>Retry failed</button>
+          <button id="clearBtn" class="btn-sm" type="button">Clear</button>
+        </div>
+      </div>
+      <div class="overall"><div id="overallFill" class="fill"></div></div>
+    </div>
+
+    <div id="active" class="list"></div>
+
+    <details id="completedWrap" class="completed" hidden>
+      <summary>Uploaded (<span id="doneCount">0</span>)</summary>
+      <div id="completed" class="list"></div>
+    </details>
+  </section>
+</main>
+
+<script>
+  const MAX_CONCURRENT = 3;
+
+  const statusEl = document.getElementById('status');
+  const pairEl = document.getElementById('pair');
+  const uploaderEl = document.getElementById('uploader');
+  const dropEl = document.getElementById('drop');
+  const filesEl = document.getElementById('files');
+  const usernameEl = document.getElementById('username');
+  const passwordEl = document.getElementById('password');
+  const pairBtn = document.getElementById('pairBtn');
+
+  const summaryEl = document.getElementById('summary');
+  const summaryCountEl = document.getElementById('summaryCount');
+  const summaryPctEl = document.getElementById('summaryPct');
+  const failedBadgeEl = document.getElementById('failedBadge');
+  const overallFillEl = document.getElementById('overallFill');
+  const retryBtn = document.getElementById('retryBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const activeEl = document.getElementById('active');
+  const completedWrapEl = document.getElementById('completedWrap');
+  const completedEl = document.getElementById('completed');
+  const doneCountEl = document.getElementById('doneCount');
+
+  let token = null;
+  let passwordRequired = false;
+  let items = [];
+  let nextId = 1;
+  let generation = 0;
+
+  function setStatus(text) {
+    statusEl.textContent = text;
+  }
+
+  function humanSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let value = bytes / 1024;
+    let i = 0;
+    while (value >= 1024 && i < units.length - 1) {
+      value /= 1024;
+      i += 1;
+    }
+    return value.toFixed(value >= 10 ? 0 : 1) + ' ' + units[i];
+  }
+
+  function extLabel(name) {
+    const match = /\.([a-z0-9]+)$/i.exec(name);
+    return match ? match[1].slice(0, 4).toUpperCase() : 'FILE';
+  }
+
+  function tokenFromHash() {
+    const raw = window.location.hash.replace(/^#/, '');
+    if (!raw) return null;
+    return new URLSearchParams(raw).get('t');
+  }
+
+  async function pair(pairingToken, username, password) {
+    const body = { token: pairingToken };
+    if (username) body.username = username;
+    if (password) body.password = password;
+    const res = await fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error((await res.text()) || ('pairing failed (' + res.status + ')'));
+    }
+  }
+
+  async function isPaired() {
+    try {
+      const res = await fetch('/api/session', { method: 'GET' });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function showUploader() {
+    pairEl.hidden = true;
+    uploaderEl.hidden = false;
+    setStatus('Paired. Upload away.');
+  }
+
+  function showPairForm() {
+    pairEl.hidden = false;
+    uploaderEl.hidden = true;
+    setStatus('Enter the pairing details to continue.');
+  }
+
+  function makeRow(item) {
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'thumb';
+    if (item.thumbUrl) {
+      const img = document.createElement('img');
+      img.src = item.thumbUrl;
+      img.alt = '';
+      img.onerror = () => {
+        img.remove();
+        thumb.textContent = extLabel(item.file.name);
+      };
+      thumb.appendChild(img);
+    } else {
+      thumb.textContent = extLabel(item.file.name);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = item.file.name;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = humanSize(item.size);
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    bar.appendChild(fill);
+    info.appendChild(name);
+    info.appendChild(meta);
+    info.appendChild(bar);
+
+    const status = document.createElement('div');
+    status.className = 'status';
+
+    row.appendChild(thumb);
+    row.appendChild(info);
+    row.appendChild(status);
+
+    item.rowEl = row;
+    item.fillEl = fill;
+    item.metaEl = meta;
+    item.statusEl = status;
+    return row;
+  }
+
+  function setItemStatus(item, status, message) {
+    item.status = status;
+    item.statusEl.className = 'status';
+    item.statusEl.textContent = '';
+    item.rowEl.classList.remove('done', 'failed');
+
+    if (status === 'queued') {
+      item.statusEl.textContent = 'queued';
+    } else if (status === 'uploading') {
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      item.statusEl.appendChild(spinner);
+    } else if (status === 'done') {
+      item.statusEl.textContent = '\u2713';
+      item.rowEl.classList.add('done');
+      if (item.rowEl.parentElement !== completedEl) {
+        completedEl.appendChild(item.rowEl);
+      }
+    } else if (status === 'failed') {
+      item.statusEl.textContent = '\u2715';
+      item.rowEl.classList.add('failed');
+      item.metaEl.textContent = humanSize(item.size) + ' - ' + (message || 'failed');
+      if (item.rowEl.parentElement !== activeEl) {
+        activeEl.appendChild(item.rowEl);
+      }
+    }
+  }
+
+  function updateSummary() {
+    const total = items.length;
+    const done = items.filter((i) => i.status === 'done').length;
+    const failed = items.filter((i) => i.status === 'failed').length;
+    const active = items.filter((i) => i.status === 'uploading' || i.status === 'queued').length;
+
+    summaryEl.hidden = total === 0;
+
+    let text = done + ' of ' + total + ' uploaded';
+    if (active > 0) text += ' (' + active + ' in progress)';
+    summaryCountEl.textContent = text;
+
+    const totalBytes = items.reduce((sum, i) => sum + i.size, 0);
+    const loadedBytes = items.reduce((sum, i) => sum + i.loaded, 0);
+    const pct = totalBytes > 0 ? Math.round((loadedBytes / totalBytes) * 100) : 0;
+    overallFillEl.style.width = pct + '%';
+    summaryPctEl.textContent = pct + '%';
+
+    failedBadgeEl.hidden = failed === 0;
+    failedBadgeEl.textContent = failed + ' failed';
+    retryBtn.hidden = failed === 0;
+
+    doneCountEl.textContent = done;
+    completedWrapEl.hidden = done === 0;
+  }
+
+  function startUpload(item) {
+    setItemStatus(item, 'uploading');
+
+    const xhr = new XMLHttpRequest();
+    item.xhr = xhr;
+    xhr.open('POST', '/api/upload');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        item.loaded = e.loaded;
+        item.fillEl.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+        updateSummary();
+      }
+    };
+    xhr.onload = () => {
+      if (item.generation !== generation) return;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        item.loaded = item.size;
+        item.fillEl.style.width = '100%';
+        setItemStatus(item, 'done');
+      } else {
+        setItemStatus(item, 'failed', 'server ' + xhr.status);
+      }
+      updateSummary();
+      pump();
+    };
+    xhr.onerror = () => {
+      if (item.generation !== generation) return;
+      setItemStatus(item, 'failed', 'network error');
+      updateSummary();
+      pump();
+    };
+    xhr.onabort = () => {
+      if (item.generation !== generation) return;
+      setItemStatus(item, 'failed', 'cancelled');
+      updateSummary();
+      pump();
+    };
+
+    const form = new FormData();
+    form.append('file', item.file, item.file.name);
+    xhr.send(form);
+  }
+
+  function pump() {
+    const active = items.filter((i) => i.status === 'uploading').length;
+    let slots = MAX_CONCURRENT - active;
+    for (const item of items) {
+      if (slots <= 0) break;
+      if (item.status === 'queued') {
+        slots -= 1;
+        startUpload(item);
+      }
+    }
+  }
+
+  function addFiles(list) {
+    const files = Array.from(list);
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      const item = {
+        id: nextId++,
+        generation,
+        file,
+        size: file.size,
+        loaded: 0,
+        status: 'queued',
+        thumbUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+      };
+      items.push(item);
+      activeEl.appendChild(makeRow(item));
+      setItemStatus(item, 'queued');
+    }
+
+    updateSummary();
+    pump();
+  }
+
+  function retryFailed() {
+    for (const item of items) {
+      if (item.status === 'failed') {
+        item.loaded = 0;
+        item.fillEl.style.width = '0%';
+        item.metaEl.textContent = humanSize(item.size);
+        setItemStatus(item, 'queued');
+      }
+    }
+    updateSummary();
+    pump();
+  }
+
+  function clearAll() {
+    generation += 1;
+    for (const item of items) {
+      if (item.xhr && item.status === 'uploading') item.xhr.abort();
+      if (item.thumbUrl) URL.revokeObjectURL(item.thumbUrl);
+    }
+    items = [];
+    activeEl.textContent = '';
+    completedEl.textContent = '';
+    updateSummary();
+    setStatus('Cleared.');
+  }
+
+  filesEl.addEventListener('change', () => addFiles(filesEl.files));
+  dropEl.addEventListener('click', (e) => {
+    if (e.target === filesEl) return;
+    filesEl.click();
+  });
+  ['dragenter', 'dragover'].forEach((ev) =>
+    dropEl.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropEl.classList.add('over');
+    })
+  );
+  ['dragleave', 'drop'].forEach((ev) =>
+    dropEl.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropEl.classList.remove('over');
+    })
+  );
+  dropEl.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files) {
+      addFiles(e.dataTransfer.files);
+    }
+  });
+
+  retryBtn.addEventListener('click', retryFailed);
+  clearBtn.addEventListener('click', clearAll);
+
+  pairBtn.addEventListener('click', async () => {
+    try {
+      await pair(token || '', usernameEl.value, passwordEl.value);
+      showUploader();
+    } catch (e) {
+      setStatus(e.message);
+    }
+  });
+
+  async function init() {
+    token = tokenFromHash();
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+
+    try {
+      const health = await (await fetch('/api/health')).json();
+      passwordRequired = !!health.password_required;
+    } catch (e) {
+      passwordRequired = false;
+    }
+
+    if (await isPaired()) {
+      showUploader();
+      return;
+    }
+
+    if (token) {
+      try {
+        await pair(token, null, null);
+        showUploader();
+        return;
+      } catch (e) {
+        // fall through to the manual pairing form
+      }
+    }
+
+    if (passwordRequired) {
+      showPairForm();
+    } else {
+      setStatus('Scan the QR code from the desktop app to pair this device.');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
